@@ -61,8 +61,8 @@ RUN;
 
 
 /* Para fazer uma amostragem com seed */
-proc surveyselect data=IRIS_TRATADO out=IRIS_SAMPLE METHOD=SRS samprate=0.8 outall seed=42;
-run;
+PROC SURVEYSELECT data=IRIS_TRATADO out=IRIS_SAMPLE METHOD=SRS samprate=0.8 outall seed=42;
+RUN;
 
 /* Vamos verificar se a amostragem respeitou a quantidade pretendida */
 PROC SQL;
@@ -115,7 +115,7 @@ select a.*, round(YHat) as YHat_ROUND
 from IRIS_DATA_PREDICAO_TEST as A
 ;QUIT;
 
-/* Agora vamos verificar a acurácia do nosso modelo */
+/* Agora vamos verificar a acurácia do nosso modelo de regressão linear */
 PROC SQL;
 create table dataset_acuracy as
 select n/sum(n) as acuracy
@@ -127,3 +127,40 @@ group by 1)
 having acertos = 1
 ;QUIT;
 /* 97%, um bom número! */
+
+
+/* Acaba aqui o código que roda no SAS University Edition */
+/* O PROC HPSPLIT só roda no SAS OnDemand */
+/* https://blogs.sas.com/content/sgf/2020/08/27/build-a-decision-tree-in-sas/ */
+
+ODS GRAPHICS ON;
+
+PROC HPSPLIT DATA=IRIS_DATA_TRAIN(where=(VAR_RESP_NUM ne .)) seed=42;
+	class VAR_RESP_NUM _CHARACTER_ sepal_length sepal_width petal_length petal_width;
+	model VAR_RESP_NUM = sepal_length sepal_width petal_length petal_width;
+	grow ENTROPY;
+	prune costcomplexity;
+	CODE FILE='/folders/myfolders/tree_fit.sas';
+    OUTPUT OUT = SCORED;
+RUN;
+
+DATA test_scored;
+    SET IRIS_DATA_TEST;
+    %INCLUDE '/folders/myfolders/tree_fit.sas';
+    IF P_VAR_RESP_NUM1 = 1 THEN YHat = 1;
+    ELSE IF P_VAR_RESP_NUM2 = 1 THEN YHat = 2;
+    ELSE IF P_VAR_RESP_NUM3 = 1 THEN YHat = 3;
+RUN;
+
+/* Agora vamos verificar a acurácia do nosso modelo de árvore */
+PROC SQL;
+	create table dataset_acuracy as
+	select n/sum(n) as acuracy
+	from (select case when var_resp_num = YHat then 1 else 0 end as acertos,
+	count(*) as n
+	from test_scored as A
+	group by 1)
+	having acertos = 1
+;QUIT;
+
+/* 46%, para surpresa de ninguém o modelo de árvore overfitou */

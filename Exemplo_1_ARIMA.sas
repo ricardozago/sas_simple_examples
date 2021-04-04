@@ -66,5 +66,48 @@ RUN;
 PROC ARIMA data=work.AirPassengers;
 	identify var=Passengers(1);
 	estimate p=(1)(12);
-	forecast id=Passengers out=forecast LEAD=60;
+	forecast id=Month interval=month LEAD=60 out=forecast;
 QUIT;
+
+
+PROC SGPLOT data=forecast cycleattrs;
+   series x=Month y=Passengers / name='MA'   legendlabel="Série observada";
+   series x=Month y=Forecast  / name='WMA'  legendlabel="Projeção";
+   xaxis label="Data" grid;
+   yaxis label="Quantidade de passageiros" grid;
+   title Resultado do modelo ARIMA com AR 1 e 12;
+RUN;
+
+/* Acaba aqui o código que roda no SAS University Edition */
+/* O PROC EXPAND só roda no SAS OnDemand */
+
+/* Vamos calcular a média móvel dos dados */
+/* Os códigos foram adaptados da documentação do SAS para o exemplo */
+/* https://blogs.sas.com/content/iml/2016/01/27/moving-average-in-sas.html */
+/* Calcula uma média móvel 5 */
+/* Calcula um alisamento exponencial igual a WMA(t) = (5yt + 4yt-1 + 3yt-2 + 2yt-3 + 1yt-4) / 15 */
+/* Calcula um alisamento exponencial com fator de 0.3 */
+PROC EXPAND data=AirPassengers out=AirPassengers_MA method=none;
+   id Month;
+   convert Passengers = MA   / transout=(movave 5);
+   convert Passengers = WMA  / transout=(movave(1 2 3 4 5)); 
+   convert Passengers = EWMA / transout=(ewma 0.3);
+RUN;
+
+PROC SGPLOT data=AirPassengers_MA cycleattrs;
+   series x=Month y=MA   / name='MA'   legendlabel="MA(5)";
+   series x=Month y=WMA  / name='WMA'  legendlabel="WMA(1,2,3,4,5)";
+   series x=Month y=EWMA / name='EWMA' legendlabel="EWMA(0.3)";
+   scatter x=Month y=Passengers;
+   keylegend 'MA' 'WMA' 'EWMA';
+   xaxis label="Data" grid;
+   yaxis label="Quantidade de passageiros" grid;
+RUN;
+
+/* Exemplo de uso do MERGE, equivale a join no SQL */
+DATA AirPassengers_MERGE;
+MERGE
+	AirPassengers
+	AirPassengers_MA (KEEP = Month MA);
+by Month;
+RUN;

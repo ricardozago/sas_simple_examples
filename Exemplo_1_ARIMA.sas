@@ -50,6 +50,13 @@ union all
 select * from TEMP
 ;QUIT;
 
+/* O PROC SQL acima é equivalente a: */
+DATA work.AirPassengers_DUP;
+SET
+	work.AirPassengers
+	TEMP;
+RUN;
+
 /* Vamos remover as linhas duplicadas */
 PROC SORT data = work.AirPassengers_DUP
 	nodupkey dupout = work.duplicadas
